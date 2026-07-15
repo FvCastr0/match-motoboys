@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Play, Check, X, RefreshCw, Users } from 'lucide-react';
+import { Play, Check, X, RefreshCw, Users, Clock, AlertTriangle } from 'lucide-react';
+import { api } from '../services/api';
 
 interface Confirmados {
   attendanceId: string;
@@ -26,36 +27,18 @@ export default function Dashboard() {
   const [customVagas, setCustomVagas] = useState<number>(10);
   const [btnLoading, setBtnLoading] = useState(false);
 
-  // Obtém o token do localStorage para segurança OWASP A01
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('admin_token') || 'token_secreto_super_seguro_da_match';
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    };
-  };
-
   const fetchTodayScale = async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('http://localhost:3000/api/admin/today-scale', {
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) {
-        if (res.status === 404) {
-          setScale(null);
-          return;
-        }
-        if (res.status === 401 || res.status === 403) {
-          throw new Error('Acesso negado. Verifique seu token de acesso nos headers.');
-        }
-        throw new Error('Erro ao buscar escala de hoje.');
-      }
-      const data = await res.json();
+      const data = await api.get<Scale>('/admin/today-scale');
       setScale(data);
     } catch (err: any) {
-      setError(err.message);
+      if (err.message.includes('404')) {
+        setScale(null);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -70,12 +53,7 @@ export default function Dashboard() {
   const handleOpenScale = async () => {
     try {
       setBtnLoading(true);
-      const res = await fetch('http://localhost:3000/api/admin/open-scale', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ vagasTotais: customVagas }),
-      });
-      if (!res.ok) throw new Error('Não foi possível abrir a escala.');
+      await api.post('/admin/open-scale', { vagasTotais: customVagas });
       await fetchTodayScale();
     } catch (err: any) {
       alert(err.message);
@@ -88,11 +66,7 @@ export default function Dashboard() {
     if (!window.confirm("Deseja realmente finalizar a escala de hoje? Nenhum outro motoboy poderá se alocar.")) return;
     try {
       setBtnLoading(true);
-      const res = await fetch('http://localhost:3000/api/admin/close-scale', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) throw new Error('Não foi possível finalizar a escala.');
+      await api.post('/admin/close-scale');
       await fetchTodayScale();
     } catch (err: any) {
       alert(err.message);
@@ -103,12 +77,7 @@ export default function Dashboard() {
 
   const handleCheckIn = async (attendanceId: string, currentCompareceu: boolean) => {
     try {
-      const res = await fetch(`http://localhost:3000/api/admin/attendances/${attendanceId}/checkin`, {
-        method: 'PATCH',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ compareceu: !currentCompareceu }),
-      });
-      if (!res.ok) throw new Error('Erro ao alterar presença.');
+      await api.patch(`/admin/attendances/${attendanceId}/checkin`, { compareceu: !currentCompareceu });
 
       if (scale) {
         setScale({
@@ -132,46 +101,56 @@ export default function Dashboard() {
           <h1 style={styles.title}>Escala Diária</h1>
           <p style={styles.subtitle}>Gerenciamento de motoboys e vagas do dia em tempo real</p>
         </div>
-        <button onClick={fetchTodayScale} style={styles.btnRefresh} title="Atualizar dados">
+        <button onClick={fetchTodayScale} style={styles.btnRefresh} title="Atualizar dados" className="btn-hover-effect">
           <RefreshCw size={20} />
         </button>
       </header>
 
       {loading && !scale ? (
-        <div style={styles.center}>Carregando dados da escala...</div>
+        <div style={styles.center}>
+          <span className="spinner-loader" style={{ marginRight: 12 }}></span>
+          Carregando dados da escala...
+        </div>
       ) : error && !scale ? (
-        <div style={{ ...styles.center, color: 'var(--accent-error)' }}>{error}</div>
+        <div style={{ ...styles.center, color: 'var(--accent-error)' }}>
+          <AlertTriangle size={24} style={{ marginRight: 12 }} />
+          {error}
+        </div>
       ) : !scale ? (
         <div style={styles.noScaleContainer} className="card-glass glow-red">
-          <Users size={48} color="var(--accent-primary)" style={{ marginBottom: 16 }} />
-          <h2>Nenhuma Escala Ativa Hoje</h2>
-          <p style={{ color: 'var(--text-secondary)', margin: '8px 0 24px 0', textAlign: 'center', maxWidth: 400 }}>
-            Inicie a escala de hoje enviando o disparo automático no grupo de WhatsApp com as vagas abaixo.
+          <div style={styles.iconCircleRed} className="pulse-animation">
+            <Users size={32} color="var(--accent-primary)" />
+          </div>
+          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 12 }}>Nenhuma Escala Ativa Hoje</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: 24, textAlign: 'center', maxWidth: 440, lineHeight: 1.6, fontSize: '0.95rem' }}>
+            Não há uma chamada em andamento para hoje. Defina a quantidade de vagas abaixo para abrir a escala e notificar os motoboys no grupo.
           </p>
           <div style={styles.openForm}>
-            <label style={{ marginRight: 12 }}>Quantidade de Vagas:</label>
-            <input
-              type="number"
-              value={customVagas}
-              onChange={(e) => setCustomVagas(Number(e.target.value))}
-              style={styles.input}
-              min={1}
-            />
-            <button onClick={handleOpenScale} disabled={btnLoading} style={styles.btnPrimary}>
+            <div style={styles.inputWrapper}>
+              <span style={styles.inputLabel}>Vagas:</span>
+              <input
+                type="number"
+                value={customVagas}
+                onChange={(e) => setCustomVagas(Number(e.target.value))}
+                style={styles.input}
+                min={1}
+              />
+            </div>
+            <button onClick={handleOpenScale} disabled={btnLoading} style={styles.btnPrimary} className="btn-hover-effect">
               <Play size={16} style={{ marginRight: 8 }} />
               {btnLoading ? 'Abrindo...' : 'Abrir Escala Agora'}
             </button>
           </div>
         </div>
       ) : (
-        <div style={styles.grid}>
+        <div className="grid-responsive-sidebar-content">
           {/* Card de Progresso */}
           <div style={styles.card} className="card-glass glow-red">
             <h2 style={styles.cardTitle}>Vagas de Hoje</h2>
             <div style={styles.progressContainer}>
               <div style={styles.progressText}>
                 <span style={styles.progressBig}>{scale.vagasPreenchidas} / {scale.vagasTotais}</span>
-                <span style={{ color: 'var(--text-secondary)' }}>Vagas preenchidas ({percentPreenchido}%)</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 500 }}>Vagas preenchidas ({percentPreenchido}%)</span>
               </div>
               <div style={styles.progressBarBg}>
                 <div style={{ ...styles.progressBarFill, width: `${Math.min(percentPreenchido, 100)}%` }} />
@@ -185,7 +164,8 @@ export default function Dashboard() {
               <button
                 onClick={handleCloseScale}
                 disabled={btnLoading}
-                style={{ ...styles.btnDanger, marginTop: 16 }}
+                style={{ ...styles.btnDanger, marginTop: 20 }}
+                className="btn-hover-effect"
               >
                 <X size={16} style={{ marginRight: 8 }} />
                 {btnLoading ? 'Finalizando...' : 'Finalizar Escala'}
@@ -194,58 +174,70 @@ export default function Dashboard() {
           </div>
 
           {/* Lista de Motoboys */}
-          <div style={{ ...styles.card, gridColumn: 'span 2' }} className="card-glass">
+          <div style={styles.card} className="card-glass">
             <h2 style={styles.cardTitle}>Fila de Presença (Ordem de Chegada)</h2>
             {scale.confirmados.length === 0 ? (
-              <div style={styles.emptyState}>Nenhum motoboy alocado para hoje ainda.</div>
+              <div style={styles.emptyState}>
+                <div style={styles.iconCircleGray}>
+                  <Clock size={32} color="var(--text-secondary)" />
+                </div>
+                <h3 style={{ fontSize: '1.2rem', color: 'var(--text-primary)', marginBottom: 8, fontWeight: 600 }}>Nenhum Motoboy Alocado</h3>
+                <p style={{ color: 'var(--text-secondary)', maxWidth: 360, margin: '0 auto', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                  Aguardando confirmações automáticas vindas do grupo de WhatsApp dos entregadores parceiros.
+                </p>
+              </div>
             ) : (
-              <table style={styles.table}>
-                <thead>
-                  <tr>
-                    <th style={styles.th}>Nome</th>
-                    <th style={styles.th}>WhatsApp</th>
-                    <th style={styles.th}>Confirmado Em</th>
-                    <th style={styles.th}>Comparecimento (Check-in)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scale.confirmados.map((item, index) => (
-                    <tr key={item.attendanceId} style={styles.tr}>
-                      <td style={styles.td}>
-                        <div style={styles.nameCell}>
-                          <span style={styles.badgeIndex}>{index + 1}</span>
-                          {item.nome}
-                        </div>
-                      </td>
-                      <td style={styles.td}>{item.telefone.split('@')[0]}</td>
-                      <td style={styles.td}>{new Date(item.confirmadoAs).toLocaleTimeString('pt-BR')}</td>
-                      <td style={styles.td}>
-                        <button
-                          onClick={() => handleCheckIn(item.attendanceId, item.compareceu)}
-                          style={{
-                            ...styles.btnCheckIn,
-                            backgroundColor: item.compareceu ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
-                            color: item.compareceu ? 'var(--accent-success)' : 'var(--accent-error)',
-                            border: `1px solid ${item.compareceu ? 'var(--accent-success)' : 'var(--accent-error)'}`,
-                          }}
-                        >
-                          {item.compareceu ? (
-                            <>
-                              <Check size={14} style={{ marginRight: 4 }} />
-                              Confirmado
-                            </>
-                          ) : (
-                            <>
-                              <X size={14} style={{ marginRight: 4 }} />
-                              Ausente
-                            </>
-                          )}
-                        </button>
-                      </td>
+              <div className="table-responsive">
+                <table style={styles.table}>
+                  <thead>
+                    <tr>
+                      <th style={styles.th}>Posição</th>
+                      <th style={styles.th}>Nome</th>
+                      <th style={styles.th}>WhatsApp</th>
+                      <th style={styles.th}>Confirmado Em</th>
+                      <th style={styles.th}>Check-in</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {scale.confirmados.map((item, index) => (
+                      <tr key={item.attendanceId} style={styles.tr}>
+                        <td style={styles.td}>
+                          <span style={styles.badgeIndex}>{index + 1}º</span>
+                        </td>
+                        <td style={styles.td}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.nome}</span>
+                        </td>
+                        <td style={styles.td}>{item.telefone.split('@')[0]}</td>
+                        <td style={styles.td}>{new Date(item.confirmadoAs).toLocaleTimeString('pt-BR')}</td>
+                        <td style={styles.td}>
+                          <button
+                            onClick={() => handleCheckIn(item.attendanceId, item.compareceu)}
+                            style={{
+                              ...styles.btnCheckIn,
+                              backgroundColor: item.compareceu ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                              color: item.compareceu ? 'var(--accent-success)' : 'var(--accent-error)',
+                              border: `1px solid ${item.compareceu ? 'var(--accent-success)' : 'var(--accent-error)'}`,
+                            }}
+                            className="btn-hover-effect"
+                          >
+                            {item.compareceu ? (
+                              <>
+                                <Check size={14} style={{ marginRight: 4 }} />
+                                Confirmado
+                              </>
+                            ) : (
+                              <>
+                                <X size={14} style={{ marginRight: 4 }} />
+                                Ausente
+                              </>
+                            )}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         </div>
@@ -263,6 +255,8 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 32,
+    flexWrap: 'wrap',
+    gap: 16,
   },
   title: {
     fontSize: '2rem',
@@ -283,59 +277,98 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: '0.2s ease',
   },
   center: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 200,
+    minHeight: 280,
     fontSize: '1.1rem',
+    color: 'var(--text-secondary)',
   },
   noScaleContainer: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    padding: '48px 24px',
+    padding: '48px 32px',
     maxWidth: 600,
     margin: '40px auto',
+    textAlign: 'center',
+  },
+  iconCircleRed: {
+    width: 72,
+    height: 72,
+    borderRadius: '50%',
+    background: 'var(--accent-primary-alpha)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '1px solid var(--accent-primary-border)',
+    marginBottom: 20,
+  },
+  iconCircleGray: {
+    width: 64,
+    height: 64,
+    borderRadius: '50%',
+    background: 'rgba(255, 255, 255, 0.03)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '1px solid var(--border-color)',
+    marginBottom: 16,
+    marginLeft: 'auto',
+    marginRight: 'auto',
   },
   openForm: {
     display: 'flex',
     alignItems: 'center',
     width: '100%',
     justifyContent: 'center',
-    gap: 8,
+    gap: 12,
+    flexWrap: 'wrap',
   },
-  input: {
+  inputWrapper: {
+    display: 'flex',
+    alignItems: 'center',
     background: 'var(--bg-secondary)',
     border: '1px solid var(--border-color)',
-    color: 'var(--text-primary)',
-    padding: '10px 14px',
     borderRadius: 8,
-    width: 80,
+    padding: '4px 12px',
+  },
+  inputLabel: {
+    fontSize: '0.85rem',
+    color: 'var(--text-secondary)',
+    fontWeight: 600,
+    marginRight: 8,
+  },
+  input: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-primary)',
+    padding: '8px 0',
+    width: 50,
     outline: 'none',
+    fontWeight: 700,
+    fontSize: '1rem',
+    textAlign: 'center',
   },
   btnPrimary: {
     background: 'var(--accent-primary)',
     color: '#fff',
     border: 'none',
-    padding: '10px 20px',
+    padding: '12px 24px',
     borderRadius: 8,
     cursor: 'pointer',
     fontWeight: 600,
     display: 'flex',
     alignItems: 'center',
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 2fr',
-    gap: 24,
+    boxShadow: '0 4px 12px var(--accent-primary-glow)',
   },
   card: {
     padding: 24,
     display: 'flex',
     flexDirection: 'column',
+    height: '100%',
   },
   cardTitle: {
     fontSize: '1.25rem',
@@ -343,6 +376,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 20,
     borderBottom: '1px solid var(--border-color)',
     paddingBottom: 12,
+    color: 'var(--text-primary)',
   },
   progressContainer: {
     display: 'flex',
@@ -363,7 +397,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   progressBarBg: {
     background: 'var(--bg-tertiary)',
-    height: 12,
+    height: 10,
     borderRadius: 6,
     overflow: 'hidden',
   },
@@ -385,7 +419,7 @@ const styles: Record<string, React.CSSProperties> = {
   emptyState: {
     textAlign: 'center',
     color: 'var(--text-secondary)',
-    padding: '40px 0',
+    padding: '48px 0',
   },
   table: {
     width: '100%',
@@ -400,29 +434,24 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid var(--border-color)',
   },
   tr: {
-    borderBottom: '1px solid rgba(255,255,255,0.03)',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.02)',
   },
   td: {
     padding: '16px',
     fontSize: '0.95rem',
   },
-  nameCell: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-  },
   badgeIndex: {
     background: 'var(--bg-tertiary)',
-    color: 'var(--text-primary)',
-    padding: '2px 8px',
-    borderRadius: 4,
-    fontSize: '0.75rem',
+    color: 'var(--accent-primary)',
+    padding: '4px 8px',
+    borderRadius: 6,
+    fontSize: '0.8rem',
     fontWeight: 700,
   },
   btnCheckIn: {
     display: 'inline-flex',
     alignItems: 'center',
-    padding: '6px 12px',
+    padding: '6px 14px',
     borderRadius: 20,
     cursor: 'pointer',
     fontWeight: 600,
@@ -430,7 +459,7 @@ const styles: Record<string, React.CSSProperties> = {
     outline: 'none',
   },
   btnDanger: {
-    background: 'rgba(239, 68, 68, 0.15)',
+    background: 'rgba(239, 68, 68, 0.12)',
     color: 'var(--accent-error)',
     border: '1px solid var(--accent-error)',
     padding: '10px 20px',

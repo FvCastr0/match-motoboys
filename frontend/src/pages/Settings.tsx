@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Info } from 'lucide-react';
+import { Save, Info, CheckCircle2 } from 'lucide-react';
+import { api } from '../services/api';
 
 interface Rule {
   id?: string;
@@ -29,31 +30,17 @@ export default function Settings() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<number | null>(null);
-
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('admin_token') || 'token_secreto_super_seguro_da_match';
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    };
-  };
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const fetchRules = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:3000/api/admin/rules', {
-        headers: getAuthHeaders(),
+      const data = await api.get<Rule[]>('/admin/rules');
+      const rulesMap = { ...rules };
+      data.forEach((r) => {
+        rulesMap[r.diaSemana] = r.vagasPadrao;
       });
-      if (res.ok) {
-        const data: Rule[] = await res.json();
-        const rulesMap = { ...rules };
-        data.forEach((r) => {
-          rulesMap[r.diaSemana] = r.vagasPadrao;
-        });
-        setRules(rulesMap);
-      } else if (res.status === 401 || res.status === 403) {
-        console.error('Acesso não autorizado às regras.');
-      }
+      setRules(rulesMap);
     } catch (err) {
       console.error('Erro ao buscar regras:', err);
     } finally {
@@ -67,19 +54,15 @@ export default function Settings() {
 
   const handleSaveRule = async (diaSemana: number) => {
     setSaving(diaSemana);
+    setSuccessMsg(null);
     try {
-      const res = await fetch('http://localhost:3000/api/admin/rules', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          diaSemana,
-          vagasPadrao: rules[diaSemana],
-        }),
+      await api.post('/admin/rules', {
+        diaSemana,
+        vagasPadrao: rules[diaSemana],
       });
 
-      if (!res.ok) throw new Error('Falha ao salvar regra de vagas.');
-
-      alert(`Vagas para ${DIAS_SEMANA_NOMES[diaSemana]} atualizadas com sucesso!`);
+      setSuccessMsg(`Vagas de ${DIAS_SEMANA_NOMES[diaSemana]} salvas com sucesso!`);
+      setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -103,17 +86,29 @@ export default function Settings() {
         </div>
       </header>
 
+      {successMsg && (
+        <div style={styles.toastSuccess}>
+          <CheckCircle2 size={18} style={{ marginRight: 8 }} />
+          <span>{successMsg}</span>
+        </div>
+      )}
+
       {loading ? (
-        <div style={styles.center}>Carregando regras de escala...</div>
+        <div style={styles.center}>
+          <span className="spinner-loader" style={{ marginRight: 12 }}></span>
+          Carregando regras de escala...
+        </div>
       ) : (
-        <div style={styles.grid}>
+        <div className="grid-responsive-2">
           {/* Caixa Informativa */}
-          <div style={{ ...styles.card, gridColumn: 'span 2' }} className="card-glass glow-red">
+          <div style={{ ...styles.card, ...styles.fullWidthCard }} className="card-glass glow-red">
             <div style={styles.infoBox}>
-              <Info size={24} color="var(--accent-primary)" style={{ flexShrink: 0 }} />
+              <div style={styles.infoIconWrapper}>
+                <Info size={24} color="var(--accent-primary)" />
+              </div>
               <div style={{ marginLeft: 16 }}>
-                <h3 style={{ marginBottom: 4 }}>Como funciona a Escala Automática?</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
+                <h3 style={{ marginBottom: 6, fontWeight: 700 }}>Como funciona a Escala Automática?</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', lineHeight: 1.6 }}>
                   Ao iniciar um novo dia, a rotina de abertura busca o dia da semana correspondente no calendário e lê as configurações abaixo. A escala diária será criada automaticamente no WhatsApp com o limite definido para aquele dia.
                 </p>
               </div>
@@ -128,20 +123,24 @@ export default function Settings() {
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: 4 }}>Vagas Padrão</p>
               </div>
               <div style={styles.actionRow}>
-                <input
-                  type="number"
-                  value={rules[index]}
-                  onChange={(e) => handleValueChange(index, Number(e.target.value))}
-                  style={styles.input}
-                  min={1}
-                />
+                <div style={styles.inputWrapper}>
+                  <input
+                    type="number"
+                    value={rules[index]}
+                    onChange={(e) => handleValueChange(index, Number(e.target.value))}
+                    style={styles.input}
+                    min={1}
+                    className="settings-input"
+                  />
+                </div>
                 <button
                   onClick={() => handleSaveRule(index)}
                   disabled={saving === index}
                   style={styles.btnSave}
+                  className="btn-hover-effect"
                 >
                   <Save size={16} />
-                  <span style={{ marginLeft: 6 }}>{saving === index ? 'Salvando...' : 'Salvar'}</span>
+                  <span style={{ marginLeft: 8 }}>{saving === index ? 'Salvando...' : 'Salvar'}</span>
                 </button>
               </div>
             </div>
@@ -172,54 +171,113 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 200,
+    minHeight: 280,
     fontSize: '1.1rem',
-  },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: 24,
+    color: 'var(--text-secondary)',
   },
   card: {
-    padding: 20,
+    padding: 24,
+  },
+  fullWidthCard: {
+    gridColumn: '1 / -1',
+    borderLeft: '4px solid var(--accent-primary)',
   },
   infoBox: {
     display: 'flex',
     alignItems: 'center',
   },
+  infoIconWrapper: {
+    background: 'var(--accent-primary-alpha)',
+    padding: 12,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '1px solid var(--accent-primary-border)',
+    flexShrink: 0,
+  },
   ruleCard: {
-    padding: 20,
+    padding: 24,
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 16,
   },
   dayTitle: {
     fontSize: '1.1rem',
     fontWeight: 600,
+    color: 'var(--text-primary)',
   },
   actionRow: {
     display: 'flex',
     alignItems: 'center',
     gap: 12,
   },
-  input: {
+  inputWrapper: {
     background: 'var(--bg-secondary)',
     border: '1px solid var(--border-color)',
-    color: 'var(--text-primary)',
-    padding: '10px 14px',
     borderRadius: 8,
-    width: 80,
+    padding: '2px 8px',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  input: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-primary)',
+    padding: '8px 4px',
+    width: 60,
     outline: 'none',
+    fontWeight: 700,
+    fontSize: '0.95rem',
+    textAlign: 'center',
   },
   btnSave: {
     background: 'var(--accent-primary)',
     color: '#fff',
     border: 'none',
-    padding: '10px 16px',
+    padding: '10px 18px',
     borderRadius: 8,
     cursor: 'pointer',
     fontWeight: 600,
     display: 'flex',
     alignItems: 'center',
+    boxShadow: '0 4px 12px var(--accent-primary-glow)',
+  },
+  toastSuccess: {
+    position: 'fixed',
+    bottom: 24,
+    right: 24,
+    backgroundColor: 'var(--accent-success)',
+    color: '#fff',
+    padding: '12px 24px',
+    borderRadius: 8,
+    display: 'flex',
+    alignItems: 'center',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.5), 0 0 15px rgba(16, 185, 129, 0.3)',
+    zIndex: 9999,
+    fontSize: '0.95rem',
+    fontWeight: 600,
+    animation: 'slideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   },
 };
+
+// Injetando animação e estilos adicionais de input no DOM
+const settingsStyleSheet = document.createElement('style');
+settingsStyleSheet.innerText = `
+  .settings-input:focus {
+    color: var(--accent-primary) !important;
+  }
+  @keyframes slideIn {
+    from {
+      transform: translateY(100px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+`;
+document.head.appendChild(settingsStyleSheet);

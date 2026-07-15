@@ -84,7 +84,6 @@ services:
       - EVOLUTION_API_KEY=${AUTHENTICATION_API_KEY:-global_apikey}
       - EVOLUTION_INSTANCE_NAME=match_instance
       - WHATSAPP_GROUP_ID=120363427371550490@g.us # JID fictício para exemplo (preencher o real em produção)
-      - VAGAS_DIARIAS=10
       - ADMIN_TOKEN=token_secreto_super_seguro_da_match # OWASP A01 token
       - FRONTEND_URL=http://localhost
     ports:

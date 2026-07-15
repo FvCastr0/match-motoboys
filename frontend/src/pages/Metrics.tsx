@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Award, Calendar } from 'lucide-react';
+import { Award, Calendar, AlertCircle, BarChart3, TrendingUp } from 'lucide-react';
+import { api } from '../services/api';
 
 interface DiasSemanaDetalhados {
   Domingo: number;
@@ -26,28 +27,11 @@ export default function Metrics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const getAuthHeaders = () => {
-    const token = localStorage.getItem('admin_token') || 'token_secreto_super_seguro_da_match';
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    };
-  };
-
   const fetchMetrics = async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await fetch('http://localhost:3000/api/admin/motoboys-metrics', {
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-          throw new Error('Acesso negado. Token administrativo inválido ou ausente.');
-        }
-        throw new Error('Erro ao buscar as métricas históricas.');
-      }
-      const data = await res.json();
+      const data = await api.get<MotoboyMetrics[]>('/admin/motoboys-metrics');
       setMetrics(data);
     } catch (err: any) {
       setError(err.message);
@@ -75,73 +59,105 @@ export default function Metrics() {
       </header>
 
       {loading ? (
-        <div style={styles.center}>Carregando métricas históricas...</div>
+        <div style={styles.center}>
+          <span className="spinner-loader" style={{ marginRight: 12 }}></span>
+          Carregando métricas históricas...
+        </div>
       ) : error ? (
-        <div style={{ ...styles.center, color: 'var(--accent-error)' }}>{error}</div>
+        <div style={{ ...styles.center, color: 'var(--accent-error)' }}>
+          <AlertCircle size={24} style={{ marginRight: 12 }} />
+          {error}
+        </div>
       ) : metrics.length === 0 ? (
-        <div style={styles.center}>Nenhum dado histórico registrado até o momento.</div>
+        <div style={styles.noDataContainer} className="card-glass">
+          <BarChart3 size={48} color="var(--text-muted)" style={{ marginBottom: 16 }} />
+          <h3>Sem Registros</h3>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: 8 }}>
+            Nenhum turno ou confirmação foi computada nas escalas ainda.
+          </p>
+        </div>
       ) : (
-        <div style={styles.layout}>
+        <div className="grid-responsive-sidebar-content">
           {/* Card Destaque */}
-          {destaque && destaque.totalTurnosRealizados > 0 && (
+          {destaque && destaque.totalTurnosRealizados > 0 ? (
             <div style={styles.destaqueCard} className="card-glass glow-success">
               <div style={styles.destaqueHeader}>
-                <Award size={32} color="var(--accent-success)" />
-                <h3 style={{ marginLeft: 12 }}>Parceiro Destaque</h3>
+                <div style={styles.iconCircleSuccess} className="pulse-animation">
+                  <Award size={32} color="var(--accent-success)" />
+                </div>
+                <div style={{ marginLeft: 16 }}>
+                  <span style={styles.destaqueLabel}>PARCEIRO DESTAQUE</span>
+                  <h3 style={styles.destaqueName}>{destaque.nome}</h3>
+                </div>
               </div>
-              <p style={styles.destaqueName}>{destaque.nome}</p>
+
               <div style={styles.destaqueStat}>
                 <span style={styles.destaqueStatVal}>{destaque.totalTurnosRealizados}</span>
-                <span style={{ color: 'var(--text-secondary)' }}>Turnos realizados no total</span>
+                <span style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', fontWeight: 500 }}>Turnos concluídos</span>
               </div>
+
               <div style={styles.destaqueFooter}>
-                <Calendar size={14} style={{ marginRight: 6 }} />
-                <span>Mais frequente às: <strong>{destaque.diaMaisFrequente}s</strong></span>
+                <Calendar size={16} style={{ marginRight: 8, color: 'var(--accent-success)' }} />
+                <span>Mais frequente às <strong>{destaque.diaMaisFrequente}s</strong></span>
               </div>
+            </div>
+          ) : (
+            <div style={styles.destaqueCardEmpty} className="card-glass">
+              <TrendingUp size={36} color="var(--text-muted)" style={{ marginBottom: 12 }} />
+              <h4>Aguardando Líder</h4>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center', marginTop: 6 }}>
+                Os dados de turnos serão compilados assim que os motoboys comparecerem às escalas.
+              </p>
             </div>
           )}
 
           {/* Tabela de Performance */}
           <div style={styles.tableCard} className="card-glass">
             <h2 style={styles.cardTitle}>Desempenho Geral</h2>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Nome do Motoboy</th>
-                  <th style={styles.th}>WhatsApp</th>
-                  <th style={styles.th}>Total de Turnos</th>
-                  <th style={styles.th}>Dia Preferido</th>
-                  <th style={styles.th}>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {metrics.map((item) => (
-                  <tr key={item.id} style={styles.tr}>
-                    <td style={styles.td}>
-                      <span style={{ fontWeight: 600 }}>{item.nome}</span>
-                    </td>
-                    <td style={styles.td}>{item.telefone.split('@')[0]}</td>
-                    <td style={styles.td}>
-                      <div style={styles.turnosBadge}>{item.totalTurnosRealizados} turnos</div>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={{ color: 'var(--accent-primary)', fontWeight: 500 }}>
-                        {item.diaMaisFrequente}
-                      </span>
-                    </td>
-                    <td style={styles.td}>
-                      <span style={{
-                        color: item.ativo ? 'var(--accent-success)' : 'var(--text-secondary)',
-                        fontSize: '0.8rem',
-                        fontWeight: 700
-                      }}>
-                        {item.ativo ? 'ATIVO' : 'INATIVO'}
-                      </span>
-                    </td>
+            <div className="table-responsive">
+              <table style={styles.table}>
+                <thead>
+                  <tr>
+                    <th style={styles.th}>Nome do Motoboy</th>
+                    <th style={styles.th}>WhatsApp</th>
+                    <th style={styles.th}>Total de Turnos</th>
+                    <th style={styles.th}>Dia Preferido</th>
+                    <th style={styles.th}>Status</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {metrics.map((item) => (
+                    <tr key={item.id} style={styles.tr}>
+                      <td style={styles.td}>
+                        <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{item.nome}</span>
+                      </td>
+                      <td style={styles.td}>{item.telefone.split('@')[0]}</td>
+                      <td style={styles.td}>
+                        <div style={styles.turnosBadge}>{item.totalTurnosRealizados} turnos</div>
+                      </td>
+                      <td style={styles.td}>
+                        <span style={{ color: 'var(--accent-primary)', fontWeight: 600 }}>
+                          {item.diaMaisFrequente}
+                        </span>
+                      </td>
+                      <td style={styles.td}>
+                        <span style={{
+                          color: item.ativo ? 'var(--accent-success)' : 'var(--text-muted)',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          background: item.ativo ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.03)',
+                          padding: '4px 8px',
+                          borderRadius: 4,
+                          border: `1px solid ${item.ativo ? 'rgba(16, 185, 129, 0.15)' : 'var(--border-color)'}`
+                        }}>
+                          {item.ativo ? 'ATIVO' : 'INATIVO'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -169,39 +185,67 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: 200,
+    minHeight: 280,
     fontSize: '1.1rem',
+    color: 'var(--text-secondary)',
   },
-  layout: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 2.5fr',
-    gap: 24,
-    alignItems: 'start',
+  noDataContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '64px 32px',
+    textAlign: 'center',
   },
   destaqueCard: {
     padding: 24,
     display: 'flex',
     flexDirection: 'column',
-    position: 'sticky',
-    top: 24,
+    justifyContent: 'space-between',
+    minHeight: 280,
+  },
+  destaqueCardEmpty: {
+    padding: 24,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 280,
+    borderStyle: 'dashed',
   },
   destaqueHeader: {
     display: 'flex',
     alignItems: 'center',
-    marginBottom: 20,
+  },
+  iconCircleSuccess: {
+    width: 56,
+    height: 56,
+    borderRadius: '50%',
+    background: 'rgba(16, 185, 129, 0.1)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    border: '1px solid rgba(16, 185, 129, 0.2)',
+  },
+  destaqueLabel: {
+    fontSize: '0.75rem',
+    fontWeight: 700,
+    color: 'var(--accent-success)',
+    letterSpacing: '1px',
+    display: 'block',
+    marginBottom: 4,
   },
   destaqueName: {
-    fontSize: '1.5rem',
+    fontSize: '1.35rem',
     fontWeight: 700,
-    marginBottom: 8,
+    color: 'var(--text-primary)',
   },
   destaqueStat: {
     display: 'flex',
     flexDirection: 'column',
-    margin: '20px 0',
+    margin: '24px 0',
   },
   destaqueStatVal: {
-    fontSize: '3rem',
+    fontSize: '3.5rem',
     fontWeight: 800,
     color: 'var(--accent-success)',
     lineHeight: 1,
@@ -214,7 +258,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: 'var(--text-secondary)',
     borderTop: '1px solid var(--border-color)',
     paddingTop: 16,
-    marginTop: 'auto',
   },
   tableCard: {
     padding: 24,
@@ -225,6 +268,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: 20,
     borderBottom: '1px solid var(--border-color)',
     paddingBottom: 12,
+    color: 'var(--text-primary)',
   },
   table: {
     width: '100%',
@@ -239,7 +283,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid var(--border-color)',
   },
   tr: {
-    borderBottom: '1px solid rgba(255,255,255,0.03)',
+    borderBottom: '1px solid rgba(255,255,255,0.02)',
   },
   td: {
     padding: '16px',
@@ -248,10 +292,11 @@ const styles: Record<string, React.CSSProperties> = {
   turnosBadge: {
     background: 'var(--accent-primary-alpha)',
     color: 'var(--accent-primary)',
-    padding: '4px 10px',
+    padding: '4px 12px',
     borderRadius: 6,
     display: 'inline-block',
     fontWeight: 600,
     fontSize: '0.85rem',
+    border: '1px solid var(--accent-primary-border)',
   },
 };

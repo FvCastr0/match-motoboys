@@ -1,7 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
+import jwt from 'jsonwebtoken';
 
-// Token secreto do admin para controle de acesso às APIs administrativas (OWASP A01: Broken Access Control)
+export interface AuthenticatedRequest extends Request {
+  user?: {
+    id: string;
+    username: string;
+  };
+}
+
+const JWT_SECRET = process.env.JWT_SECRET || 'secret_key_match_pizza_system_jwt_token_auth_flow';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN;
 
 if (!ADMIN_TOKEN && process.env.NODE_ENV === 'production') {
@@ -9,9 +17,9 @@ if (!ADMIN_TOKEN && process.env.NODE_ENV === 'production') {
 }
 
 /**
- * Middleware para validar se a requisição possui o token correto no Header
+ * Middleware para validar se a requisição possui o token correto no Header (JWT ou fallback de Admin)
  */
-export function authenticateAdmin(req: Request, res: Response, next: NextFunction) {
+export function authenticateAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -20,11 +28,22 @@ export function authenticateAdmin(req: Request, res: Response, next: NextFunctio
 
   const token = authHeader.split(' ')[1];
 
-  if (token !== ADMIN_TOKEN) {
-    return res.status(403).json({ error: 'Acesso negado. Token inválido.' });
+  // Fallback para o ADMIN_TOKEN estático se necessário
+  if (ADMIN_TOKEN && token === ADMIN_TOKEN) {
+    req.user = { id: 'admin-fallback', username: 'admin' };
+    return next();
   }
 
-  next();
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { id: string; username: string };
+    req.user = {
+      id: decoded.id,
+      username: decoded.username,
+    };
+    next();
+  } catch (err) {
+    return res.status(403).json({ error: 'Acesso negado. Token inválido ou expirado.' });
+  }
 }
 
 /**

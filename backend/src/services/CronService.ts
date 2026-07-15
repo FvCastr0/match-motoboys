@@ -12,8 +12,8 @@ export class CronService {
    * Inicializa as cronjobs de abertura e fechamento de escala
    */
   init() {
-    const openCronExpression = process.env.SCALE_OPEN_CRON || '0 8 * * *';
-    const closeCronExpression = process.env.SCALE_CLOSE_CRON || '0 6 * * *';
+    const openCronExpression = process.env.SCALE_OPEN_CRON || '0 12 * * *';
+    const closeCronExpression = process.env.SCALE_CLOSE_CRON || '0 0 * * *';
 
     console.log(`⏰ Cron Job de Abertura de Vagas configurado para: "${openCronExpression}"`);
     console.log(`⏰ Cron Job de Fechamento de Vagas configurado para: "${closeCronExpression}"`);

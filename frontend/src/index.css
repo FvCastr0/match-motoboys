@@ -1,18 +1,22 @@
 :root {
-  --bg-primary: #0a0a0a;
-  --bg-secondary: #171717;
-  --bg-tertiary: #262626;
+  --bg-primary: #080808;
+  --bg-secondary: #121212;
+  --bg-tertiary: #1e1e1e;
   --accent-primary: #e50914; /* Vermelho marcante Match Pizza */
-  --accent-primary-glow: rgba(229, 9, 20, 0.25);
-  --accent-primary-alpha: rgba(229, 9, 20, 0.1);
-  --accent-primary-border: rgba(229, 9, 20, 0.2);
+  --accent-primary-glow: rgba(229, 9, 20, 0.35);
+  --accent-primary-alpha: rgba(229, 9, 20, 0.12);
+  --accent-primary-border: rgba(229, 9, 20, 0.25);
   --accent-success: #10b981;
+  --accent-success-glow: rgba(16, 185, 129, 0.25);
   --accent-warning: #f59e0b;
+  --accent-warning-glow: rgba(245, 158, 11, 0.25);
   --accent-error: #ef4444;
   --text-primary: #f5f5f5;
-  --text-secondary: #a3a3a3;
-  --border-color: #333333;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --border-color: rgba(255, 255, 255, 0.08);
   --font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
@@ -27,6 +31,7 @@ body {
   font-family: var(--font-family);
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 a {
@@ -36,32 +41,135 @@ a {
 
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: var(--bg-primary);
 }
 ::-webkit-scrollbar-thumb {
   background: var(--bg-tertiary);
-  border-radius: 4px;
+  border-radius: 10px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: var(--text-muted);
 }
 
 /* Glassmorphism utility */
 .card-glass {
-  background: rgba(23, 23, 23, 0.7);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 12px;
+  background: rgba(18, 18, 18, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  transition: var(--transition-smooth);
+}
+
+.card-glass:hover {
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .glow-red {
-  box-shadow: 0 0 15px var(--accent-primary-glow);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 0 15px var(--accent-primary-glow);
 }
 
 .glow-success {
-  box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5), 0 0 15px var(--accent-success-glow);
+}
+
+/* Responsive Table Wrapper */
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 12px;
+  border-radius: 8px;
+}
+
+/* Responsive Grids */
+.grid-responsive-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+.grid-responsive-sidebar-content {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 24px;
+}
+
+/* Responsive Hide/Show Helpers */
+.hide-mobile {
+  display: block;
+}
+.show-mobile {
+  display: none;
+}
+
+/* Base button and input animations */
+input, button, select, textarea {
+  transition: var(--transition-smooth);
+}
+
+.btn-hover-effect:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: brightness(1.1);
+}
+.btn-hover-effect:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Pulsing and Floating animations */
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+.pulse-animation {
+  animation: pulse-glow 3s infinite ease-in-out;
+}
+
+/* Loading Spinner */
+.spinner-loader {
+  width: 24px;
+  height: 24px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive adjustments */
+@media (max-width: 1024px) {
+  .grid-responsive-sidebar-content {
+    grid-template-columns: 1fr;
+  }
+  .grid-responsive-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .hide-mobile {
+    display: none !important;
+  }
+  .show-mobile {
+    display: block !important;
+  }
+  .card-glass {
+    padding: 16px !important;
+  }
 }

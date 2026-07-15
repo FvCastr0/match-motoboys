@@ -1,11 +1,14 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import bcrypt from 'bcryptjs';
+import { prisma } from './prisma';
 import { WhatsAppService } from './services/WhatsAppService';
 import { CronService } from './services/CronService';
 import { AdminController } from './controllers/AdminController';
 import { ScheduleRuleController } from './controllers/ScheduleRuleController';
 import { EvolutionController } from './controllers/EvolutionController';
+import { AuthController } from './controllers/AuthController';
 import { authenticateAdmin, apiRateLimiter } from './middlewares/security';
 
 const app = express();
@@ -29,6 +32,27 @@ const wpService = new WhatsAppService();
 const adminController = new AdminController();
 const ruleController = new ScheduleRuleController();
 const evolutionController = new EvolutionController();
+const authController = new AuthController();
+
+// Seed de Usuário Inicial Administrador
+async function seedDefaultUser() {
+  try {
+    const userCount = await prisma.user.count();
+    if (userCount === 0) {
+      const hashedPassword = await bcrypt.hash('admin123', 10);
+      await prisma.user.create({
+        data: {
+          username: 'admin',
+          password: hashedPassword,
+        },
+      });
+      console.log('✅ [SEED] Usuário administrador padrão criado com sucesso: admin / admin123');
+    }
+  } catch (err) {
+    console.error('❌ [SEED] Erro ao verificar/criar usuário inicial:', err);
+  }
+}
+seedDefaultUser();
 
 // Inicializa a conexão do bot de WhatsApp (Queue Worker) e depois as cronjobs
 wpService.connect().then(() => {
@@ -37,6 +61,10 @@ wpService.connect().then(() => {
 }).catch((err) => {
   console.error('Falha crítica na conexão do WhatsApp:', err);
 });
+
+// 🔓 Rotas de Autenticação Públicas (Sem necessidade de JWT)
+app.post('/api/auth/login', authController.login.bind(authController));
+app.get('/api/auth/me', authenticateAdmin, authController.me.bind(authController));
 
 // 📌 Webhook público recebido da Evolution API
 app.post('/api/webhook/evolution', async (req, res) => {
