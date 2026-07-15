@@ -92,4 +92,25 @@ export class ScheduleService {
 
     return { status: 'SUCCESS', lotou, motoboyNome: motoboy.nome };
   }
+
+  /**
+   * Finaliza a escala ativa (busca a escala com status 'ABERTO' mais recente e fecha).
+   */
+  async closeActiveSchedule() {
+    const activeSchedule = await prisma.schedule.findFirst({
+      where: { status: 'ABERTO' },
+      orderBy: { data: 'desc' },
+    });
+
+    if (!activeSchedule) {
+      return null;
+    }
+
+    const updated = await prisma.schedule.update({
+      where: { id: activeSchedule.id },
+      data: { status: 'FECHADO' },
+    });
+
+    return updated;
+  }
 }

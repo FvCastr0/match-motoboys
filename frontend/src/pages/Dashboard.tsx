@@ -84,6 +84,23 @@ export default function Dashboard() {
     }
   };
 
+  const handleCloseScale = async () => {
+    if (!window.confirm("Deseja realmente finalizar a escala de hoje? Nenhum outro motoboy poderá se alocar.")) return;
+    try {
+      setBtnLoading(true);
+      const res = await fetch('http://localhost:3000/api/admin/close-scale', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error('Não foi possível finalizar a escala.');
+      await fetchTodayScale();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setBtnLoading(false);
+    }
+  };
+
   const handleCheckIn = async (attendanceId: string, currentCompareceu: boolean) => {
     try {
       const res = await fetch(`http://localhost:3000/api/admin/attendances/${attendanceId}/checkin`, {
@@ -164,6 +181,16 @@ export default function Dashboard() {
               <span>Status: <strong style={{ color: scale.status === 'ABERTO' ? 'var(--accent-success)' : 'var(--accent-error)' }}>{scale.status}</strong></span>
               <span>Data: {new Date(scale.data).toLocaleDateString('pt-BR')}</span>
             </div>
+            {scale.status === 'ABERTO' && (
+              <button
+                onClick={handleCloseScale}
+                disabled={btnLoading}
+                style={{ ...styles.btnDanger, marginTop: 16 }}
+              >
+                <X size={16} style={{ marginRight: 8 }} />
+                {btnLoading ? 'Finalizando...' : 'Finalizar Escala'}
+              </button>
+            )}
           </div>
 
           {/* Lista de Motoboys */}
@@ -401,5 +428,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     fontSize: '0.8rem',
     outline: 'none',
+  },
+  btnDanger: {
+    background: 'rgba(239, 68, 68, 0.15)',
+    color: 'var(--accent-error)',
+    border: '1px solid var(--accent-error)',
+    padding: '10px 20px',
+    borderRadius: 8,
+    cursor: 'pointer',
+    fontWeight: 600,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: '0.2s ease',
   },
 };

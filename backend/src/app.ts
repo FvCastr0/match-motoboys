@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import { WhatsAppService } from './services/WhatsAppService';
+import { CronService } from './services/CronService';
 import { AdminController } from './controllers/AdminController';
 import { ScheduleRuleController } from './controllers/ScheduleRuleController';
 import { EvolutionController } from './controllers/EvolutionController';
@@ -15,7 +16,7 @@ app.use(helmet());
 // Configuração do CORS restrito ao domínio da aplicação (OWASP A05)
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost',
+    origin: '*',
   })
 );
 
@@ -29,8 +30,11 @@ const adminController = new AdminController();
 const ruleController = new ScheduleRuleController();
 const evolutionController = new EvolutionController();
 
-// Inicializa a conexão do bot de WhatsApp (Queue Worker)
-wpService.connect().catch((err) => {
+// Inicializa a conexão do bot de WhatsApp (Queue Worker) e depois as cronjobs
+wpService.connect().then(() => {
+  const cronService = new CronService(wpService);
+  cronService.init();
+}).catch((err) => {
   console.error('Falha crítica na conexão do WhatsApp:', err);
 });
 
@@ -80,6 +84,19 @@ app.post('/api/admin/open-scale', authenticateAdmin, async (req, res) => {
   try {
     await wpService.openDailySchedule(vagasTotais);
     return res.json({ message: 'Escala aberta com sucesso no banco e disparada no grupo!' });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// 🔒 Rota manual para fechar a escala do dia
+app.post('/api/admin/close-scale', authenticateAdmin, async (req, res) => {
+  try {
+    const closed = await wpService.closeDailySchedule();
+    if (!closed) {
+      return res.status(404).json({ error: 'Nenhuma escala ativa aberta para finalizar.' });
+    }
+    return res.json({ message: 'Escala finalizada com sucesso no banco e notificada no grupo!' });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });
   }

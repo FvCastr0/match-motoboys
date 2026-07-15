@@ -87,7 +87,7 @@ export class WhatsAppService {
 
     if (!limiteVagas) {
       const rule = await prisma.scheduleRule.findUnique({ where: { diaSemana } });
-      limiteVagas = rule ? rule.vagasPadrao : Number(process.env.VAGAS_DIARIAS || 10);
+      limiteVagas = rule ? rule.vagasPadrao : 10;
     }
 
     try {
@@ -108,9 +108,37 @@ export class WhatsAppService {
         `Para garantir a sua vaga, responda a esta mensagem apenas com *EU*.\n\n` +
         `Boa rota a todos! 🚀`;
 
-      await this.sendGroupMessage(mensagemEscala);
+      try {
+        await this.sendGroupMessage(mensagemEscala);
+      } catch (msgErr: any) {
+        console.warn('⚠️ A escala foi aberta no banco, mas não foi possível avisar no grupo:', msgErr.message);
+      }
     } catch (err: any) {
-      console.error('Erro ao abrir escala diária:', err.message);
+      console.error('Erro ao abrir escala diária no banco:', err.message);
+    }
+  }
+
+  /**
+   * Finaliza a escala diária ativa e envia um aviso no grupo do WhatsApp
+   */
+  async closeDailySchedule() {
+    try {
+      const closedSchedule = await this.scheduleService.closeActiveSchedule();
+      if (closedSchedule) {
+        console.log(`📅 Escala do dia ${closedSchedule.data.toISOString().split('T')[0]} finalizada com sucesso no banco.`);
+        try {
+          await this.sendGroupMessage('🔒 *A escala de hoje está oficialmente encerrada.*');
+        } catch (msgErr: any) {
+          console.warn('⚠️ A escala foi fechada no banco, mas não foi possível avisar no grupo:', msgErr.message);
+        }
+        return closedSchedule;
+      } else {
+        console.log('📅 Nenhuma escala ativa encontrada para finalizar.');
+        return null;
+      }
+    } catch (err: any) {
+      console.error('Erro ao finalizar escala diária no banco:', err.message);
+      throw err;
     }
   }
 

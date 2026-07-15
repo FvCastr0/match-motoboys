@@ -75,8 +75,18 @@ services:
     build: ./backend
     container_name: match_backend
     restart: always
-    env_file:
-      - ./env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://motoboys_user:BEgf1P8dAXTvUQcI1rUq6bID1VlY21ls@dpg-d9aqlujtqb8s739pfkng-a.oregon-postgres.render.com/motoboys?sslmode=true
+      - REDIS_URL=redis://redis:6379
+      - PORT=3000
+      - EVOLUTION_API_URL=http://evolution:8080
+      - EVOLUTION_API_KEY=${AUTHENTICATION_API_KEY:-global_apikey}
+      - EVOLUTION_INSTANCE_NAME=match_instance
+      - WHATSAPP_GROUP_ID=120363427371550490@g.us # JID fictício para exemplo (preencher o real em produção)
+      - VAGAS_DIARIAS=10
+      - ADMIN_TOKEN=token_secreto_super_seguro_da_match # OWASP A01 token
+      - FRONTEND_URL=http://localhost
     ports:
       - "3000:3000"
     depends_on:
