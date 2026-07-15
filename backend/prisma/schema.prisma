@@ -1,0 +1,72 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Motoboy {
+  id          String       @id @default(uuid())
+  nome        String
+  telefone    String       @unique // Salva no formato JID (ex: 5532999999999@s.whatsapp.net)
+  ativo       Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  presencas   Attendance[]
+
+  @@map("motoboys")
+}
+
+model Schedule {
+  id              String       @id @default(uuid())
+  data            DateTime     @unique @db.Date // Garante apenas uma escala ativa por data calendário
+  vagasTotais     Int
+  vagasPreenchidas Int         @default(0)
+  status          ScheduleStatus @default(ABERTO)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  alocados        Attendance[]
+
+  @@map("schedules")
+}
+
+model Attendance {
+  id             String       @id @default(uuid())
+  scheduleId     String
+  motoboyId      String
+  confirmadoAs   DateTime     @default(now()) // Horário exato que confirmou no WhatsApp
+  compareceu     Boolean      @default(false) // Check-in manual realizado pela gestão na base
+  horarioCheckIn DateTime?
+
+  schedule       Schedule     @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  motoboy        Motoboy      @relation(fields: [motoboyId], references: [id], onDelete: Cascade)
+
+  @@unique([scheduleId, motoboyId]) // Evita dupla alocação do mesmo motoboy no mesmo dia
+  @@map("attendances")
+}
+
+model WhatsappSession {
+  id        String   @id
+  data      String   @db.Text // Dados de autenticação serializados (Creds do Baileys)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("whatsapp_sessions")
+}
+
+model ScheduleRule {
+  id              String   @id @default(uuid())
+  diaSemana       Int      @unique // 0 = Domingo, 1 = Segunda, etc.
+  vagasPadrao     Int      @default(10)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("schedule_rules")
+}
+
+enum ScheduleStatus {
+  ABERTO
+  FECHADO
+  CANCELADO
+}
